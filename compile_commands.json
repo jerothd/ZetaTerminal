@@ -1,0 +1,14 @@
+[
+{
+  "directory": "/home/96rDHK3BmQSL2QiRC5Ara/CLionProjects/ZetaTerminal/cmake-build-debug",
+  "command": "/bin/c++ -DQT_CORE_LIB -DQT_GUI_LIB -DQT_NETWORK_LIB -DQT_WIDGETS_LIB -I/home/96rDHK3BmQSL2QiRC5Ara/CLionProjects/ZetaTerminal/cmake-build-debug/zeta-terminal_autogen/include -isystem /usr/include/qt6/QtWidgets -isystem /usr/include/qt6 -isystem /usr/include/qt6/QtCore -isystem /usr/lib64/qt6/mkspecs/linux-g++ -isystem /usr/include/qt6/QtGui -isystem /usr/include/qt6/QtNetwork -g -std=c++17 -fdiagnostics-color=always -o CMakeFiles/zeta-terminal.dir/zeta-terminal_autogen/mocs_compilation.cpp.o -c /home/96rDHK3BmQSL2QiRC5Ara/CLionProjects/ZetaTerminal/cmake-build-debug/zeta-terminal_autogen/mocs_compilation.cpp",
+  "file": "/home/96rDHK3BmQSL2QiRC5Ara/CLionProjects/ZetaTerminal/cmake-build-debug/zeta-terminal_autogen/mocs_compilation.cpp",
+  "output": "CMakeFiles/zeta-terminal.dir/zeta-terminal_autogen/mocs_compilation.cpp.o"
+},
+{
+  "directory": "/home/96rDHK3BmQSL2QiRC5Ara/CLionProjects/ZetaTerminal/cmake-build-debug",
+  "command": "/bin/c++ -DQT_CORE_LIB -DQT_GUI_LIB -DQT_NETWORK_LIB -DQT_WIDGETS_LIB -I/home/96rDHK3BmQSL2QiRC5Ara/CLionProjects/ZetaTerminal/cmake-build-debug/zeta-terminal_autogen/include -isystem /usr/include/qt6/QtWidgets -isystem /usr/include/qt6 -isystem /usr/include/qt6/QtCore -isystem /usr/lib64/qt6/mkspecs/linux-g++ -isystem /usr/include/qt6/QtGui -isystem /usr/include/qt6/QtNetwork -g -std=c++17 -fdiagnostics-color=always -o CMakeFiles/zeta-terminal.dir/main.cpp.o -c /home/96rDHK3BmQSL2QiRC5Ara/CLionProjects/ZetaTerminal/main.cpp",
+  "file": "/home/96rDHK3BmQSL2QiRC5Ara/CLionProjects/ZetaTerminal/main.cpp",
+  "output": "CMakeFiles/zeta-terminal.dir/main.cpp.o"
+}
+]
