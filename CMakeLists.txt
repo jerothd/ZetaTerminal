@@ -1,0 +1,37 @@
+cmake_minimum_required(VERSION 3.24)
+project(ZetaTerminal LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTORCC ON)
+
+if(NOT Qt6_DIR)
+    if(EXISTS "/usr/lib64/cmake/Qt6/Qt6Config.cmake")
+        set(Qt6_DIR "/usr/lib64/cmake/Qt6" CACHE PATH "Qt6 CMake package directory")
+    endif()
+endif()
+
+find_package(Qt6 REQUIRED COMPONENTS Widgets Network)
+add_executable(zeta-terminal main.cpp)
+find_package(PkgConfig QUIET)
+
+if(PkgConfig_FOUND)
+    pkg_check_modules(QTERMWIDGET QUIET qtermwidget5)
+    if(QTERMWIDGET_FOUND)
+        message(STATUS "Found qtermwidget5 via pkg-config")
+        target_include_directories(zeta-terminal PRIVATE ${QTERMWIDGET_INCLUDE_DIRS})
+        target_link_directories(zeta-terminal PRIVATE ${QTERMWIDGET_LIBRARY_DIRS})
+        target_link_libraries(zeta-terminal PRIVATE ${QTERMWIDGET_LDFLAGS})
+        target_compile_definitions(zeta-terminal PRIVATE USE_QTERMWIDGET=1)
+    else()
+        message(STATUS "qtermwidget5 not found via pkg-config; building without QTermWidget integration")
+    endif()
+else()
+    message(STATUS "pkg-config not found; skipping QTermWidget detection")
+endif()
+
+target_link_libraries(zeta-terminal PRIVATE Qt6::Widgets Qt6::Network util)
