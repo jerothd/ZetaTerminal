@@ -1,0 +1,1331 @@
+# ZetaTerminal White Paper
+
+## A Local-First AI Terminal for Linux
+
+ZetaTerminal is a proposed Linux terminal application designed to combine a standard, stable terminal emulator with
+a local AI agent powered by Ollama. Its goal is to provide the convenience of modern AI-assisted terminals while
+preserving privacy, offline usability, transparency, and user control.
+
+Unlike cloud-based AI terminal products, ZetaTerminal is intended to run entirely on the user's machine. The terminal
+interface remains fully functional without internet access, and AI features are designed to operate through a local
+model served from `127.0.0.1`, typically using Ollama.
+
+---
+
+## 1. Executive Summary
+
+Modern AI terminals such as Warp Terminal and Wave Terminal demonstrate the usefulness of natural-language command
+assistance, command explanation, debugging support, and task automation. However, many of these tools depend on
+cloud-hosted models, subscription services, and internet access.
+
+ZetaTerminal aims to provide a local-first alternative:
+
+- A real Linux terminal emulator as the foundation
+- Local AI integration through Ollama
+- Plain-language task requests
+- AI-generated diagnostic and remediation plans
+- User-approved command execution
+- Visible audit trails for all AI actions
+- Offline operation after local model installation
+- No required cloud account or subscription
+
+The long-term vision is to let users ask questions such as:
+```
+text
+Why is Docker not starting? Check it and fix it.
+```
+
+```
+text
+My disk is almost full. Find out what is using space and suggest safe cleanup steps.
+```
+
+```
+text
+Set up a Python virtual environment for this project and install the dependencies.
+```
+ZetaTerminal should then consult a local AI model, produce a clear plan, request approval where needed, execute
+approved commands, observe terminal output, adapt its plan, and summarize the results.
+
+The primary principle is:
+
+> The AI should assist and operate the terminal safely, not replace the terminal or hide actions from the user.
+
+---
+
+## 2. Product Vision
+
+ZetaTerminal is intended to become a private, offline-capable AI terminal for Linux.
+
+Its purpose is to combine:
+
+1. The reliability of a standard terminal emulator
+2. The convenience of natural-language AI assistance
+3. The privacy of local inference
+4. The safety of user-approved command execution
+
+The project should prioritize terminal correctness first. AI features should be layered on top of a stable terminal
+foundation, not used as a substitute for proper terminal behavior.
+
+---
+
+## 3. Core Goals
+
+### 3.1 Standard Terminal Behavior
+
+ZetaTerminal must first behave like a normal Linux terminal.
+
+It should support:
+
+- Persistent shell sessions
+- Interactive commands
+- PTY-backed input/output
+- ANSI escape sequences
+- Terminal resizing
+- Scrollback
+- Copy and paste
+- Tabs
+- Keyboard shortcuts
+- `sudo`
+- `ssh`
+- Editors such as `vim` and `nano`
+- Full-screen tools such as `top`, `htop`, `less`, and `man`
+
+Commands such as the following should work naturally:
+```
+bash
+cd /tmp
+pwd
+export TEST=value
+echo "$TEST"
+vim test.txt
+top
+sudo apt update
+ssh user@example.com
+```
+A terminal that only runs one command at a time is not sufficient for the long-term goal. ZetaTerminal should be
+built around a real terminal session.
+
+---
+
+### 3.2 Local AI Operation
+
+The AI system should use a locally running model server, with Ollama as the primary target.
+
+Default endpoint:
+```
+text
+http://127.0.0.1:11434
+```
+Typical chat endpoint:
+```
+text
+http://127.0.0.1:11434/v1/chat/completions
+```
+Potential models include:
+```
+text
+llama3.1:8b
+llama3.2:3b
+qwen2.5-coder:7b
+deepseek-coder
+mistral
+codellama
+```
+The application should provide:
+
+- Ollama connection testing
+- Model selection
+- Model availability checks
+- Friendly error messages
+- Request cancellation
+- Optional streaming responses
+- Timeout handling
+- Conversation reset
+
+---
+
+### 3.3 Natural-Language Task Execution
+
+Users should be able to describe a task in plain language:
+```
+text
+Fix my broken Python virtual environment.
+```
+
+```
+text
+Check why nginx is failing and suggest a fix.
+```
+
+```
+text
+Find large files in my home directory and help me clean them safely.
+```
+The AI should:
+
+1. Understand the request
+2. Gather relevant context
+3. Create a plan
+4. Show the plan to the user
+5. Classify the risk of proposed commands
+6. Request approval when required
+7. Execute approved commands
+8. Observe command output
+9. Revise its plan if needed
+10. Produce a final summary
+
+---
+
+## 4. Non-Goals
+
+ZetaTerminal should not attempt to become a dangerous autonomous root-level system administrator.
+
+The project should avoid:
+
+- Hidden command execution
+- Silent destructive actions
+- Cloud-only AI dependencies
+- Mandatory subscriptions
+- Uploading terminal contents to remote services by default
+- Running arbitrary AI-generated commands without review
+- Replacing a real terminal backend with a simplistic command runner
+
+The application should remain useful even when AI is disabled or unavailable.
+
+---
+
+## 5. Design Principles
+
+### 5.1 Terminal First
+
+The terminal must work independently of AI.
+
+If Ollama is not installed, not running, or the selected model is unavailable, ZetaTerminal should still function as
+a normal terminal.
+
+---
+
+### 5.2 Local First
+
+AI features should operate against a local endpoint by default.
+
+The standard configuration should not require:
+
+- Internet access
+- A cloud account
+- API keys
+- Subscriptions
+- Remote telemetry
+
+---
+
+### 5.3 Transparency
+
+Every AI-proposed command should be visible to the user.
+
+The application should show:
+
+- The AI's plan
+- Each command to be executed
+- The risk level of each command
+- Command output
+- Exit codes
+- Errors
+- Final changes made
+
+---
+
+### 5.4 User Control
+
+The user should remain in control.
+
+High-risk actions must require explicit approval. The user should be able to stop, cancel, or reject an AI task at
+any time.
+
+---
+
+### 5.5 Safety by Default
+
+The default AI mode should be conservative.
+
+Recommended initial default:
+```
+text
+AI may suggest commands.
+AI may auto-run read-only diagnostics if enabled.
+AI must ask before changing the system.
+AI must always ask before using sudo.
+AI must always ask before deleting files.
+```
+---
+
+### 5.6 Auditability
+
+AI activity should produce a clear execution trail.
+
+A completed AI task should show:
+
+- Original user request
+- AI plan
+- Approved commands
+- Command output
+- Errors
+- Files or services changed
+- Final result
+
+---
+
+## 6. Recommended System Architecture
+
+A high-level architecture should separate terminal functionality from AI functionality.
+```
+text
+ZetaTerminal
+├── Terminal Layer
+│   ├── Terminal emulator backend
+│   ├── Terminal sessions
+│   ├── Tabs
+│   ├── Shell lifecycle
+│   └── User input/output
+│
+├── AI Layer
+│   ├── Ollama client
+│   ├── Prompt builder
+│   ├── Context collector
+│   └── Response parser
+│
+├── Agent Layer
+│   ├── Agent controller
+│   ├── Plan model
+│   ├── Command risk classifier
+│   ├── Command executor
+│   └── Execution observer
+│
+├── UI Layer
+│   ├── Main window
+│   ├── Terminal tabs
+│   ├── AI panel
+│   ├── Plan review widget
+│   └── Preferences dialog
+│
+├── Settings Layer
+│   ├── Persistent settings
+│   ├── Profiles
+│   └── User preferences
+│
+└── Logging Layer
+    ├── Application logs
+    ├── AI task logs
+    └── Error diagnostics
+```
+---
+
+## 7. Proposed Project Structure
+
+A scalable project structure could look like:
+```
+text
+ZetaTerminal/
+  CMakeLists.txt
+  README.md
+  SAFETY.md
+  OLLAMA.md
+  ARCHITECTURE.md
+  BUILDING.md
+  CHANGELOG.md
+
+  src/
+    main.cpp
+
+    ui/
+      MainWindow.h
+      MainWindow.cpp
+      TerminalTab.h
+      TerminalTab.cpp
+      AiPanel.h
+      AiPanel.cpp
+      PlanReviewWidget.h
+      PlanReviewWidget.cpp
+      PreferencesDialog.h
+      PreferencesDialog.cpp
+
+    terminal/
+      TerminalSession.h
+      TerminalSession.cpp
+      TerminalBackend.h
+      TerminalBackend.cpp
+      QTermWidgetTerminalBackend.h
+      QTermWidgetTerminalBackend.cpp
+
+    ai/
+      OllamaClient.h
+      OllamaClient.cpp
+      AiModel.h
+      AiModel.cpp
+      PromptBuilder.h
+      PromptBuilder.cpp
+
+    agent/
+      AgentController.h
+      AgentController.cpp
+      AgentPlan.h
+      AgentPlan.cpp
+      AgentStep.h
+      AgentStep.cpp
+      CommandExecutor.h
+      CommandExecutor.cpp
+      CommandRiskClassifier.h
+      CommandRiskClassifier.cpp
+      ContextCollector.h
+      ContextCollector.cpp
+      ExecutionResult.h
+      ExecutionResult.cpp
+
+    settings/
+      SettingsManager.h
+      SettingsManager.cpp
+
+    theme/
+      ThemeManager.h
+      ThemeManager.cpp
+      ColorScheme.h
+      ColorScheme.cpp
+
+    logging/
+      Logger.h
+      Logger.cpp
+```
+This structure separates concerns and prevents the application from becoming a single monolithic source file.
+
+---
+
+## 8. Terminal Layer
+
+The terminal layer is the most important foundation.
+
+ZetaTerminal should use a proper terminal backend capable of PTY-backed shell sessions. For Qt-based development,
+QTermWidget is a practical option.
+
+The terminal backend should support:
+
+- Persistent shell process
+- PTY interaction
+- Environment variables
+- Working directory
+- ANSI rendering
+- Scrollback
+- Font configuration
+- Color schemes
+- Keyboard input
+- Clipboard actions
+- Terminal resizing
+
+The terminal layer should not depend on the AI layer. It must be possible to use ZetaTerminal normally with no AI
+features enabled.
+
+---
+
+## 9. AI Layer
+
+The AI layer communicates with the local model server.
+
+Primary responsibilities:
+
+- Connect to Ollama
+- Send chat requests
+- Stream or receive responses
+- Parse responses
+- Handle network errors
+- Handle invalid JSON
+- Support timeout and cancellation
+- Maintain model settings
+- Provide connection status
+
+The AI layer should not execute commands directly. It should only produce responses, plans, explanations, or structured
+command proposals.
+
+---
+
+## 10. Agent Layer
+
+The agent layer turns AI output into controlled action.
+
+Responsibilities:
+
+- Manage AI task lifecycle
+- Request plans from AI
+- Validate structured responses
+- Classify command risk
+- Ask the user for approval
+- Execute approved commands
+- Capture output
+- Feed observations back to AI
+- Continue, stop, or revise the task
+- Produce final summaries
+
+The agent layer is where safety rules are enforced.
+
+---
+
+## 11. Controlled Command Execution
+
+AI-generated commands should not be executed directly without passing through a controlled command executor.
+
+A command execution request should include:
+```
+json
+{
+  "command": "systemctl status docker --no-pager",
+  "working_directory": "/home/user",
+  "timeout_seconds": 15,
+  "requires_confirmation": false
+}
+```
+A command execution result should include:
+```
+json
+{
+  "command": "systemctl status docker --no-pager",
+  "exit_code": 3,
+  "stdout": "...",
+  "stderr": "",
+  "timed_out": false,
+  "duration_ms": 842
+}
+```
+The result can then be sent back to the AI as an observation.
+
+---
+
+## 12. Visible Terminal vs AI Executor
+
+ZetaTerminal should support two execution paths.
+
+### 12.1 Visible Terminal
+
+The visible terminal is for normal user activity and interactive programs.
+
+Use it for:
+
+- Manual commands
+- Editors
+- SSH sessions
+- REPLs
+- Full-screen terminal tools
+- Interactive prompts
+
+### 12.2 AI Command Executor
+
+The AI command executor is for controlled, non-interactive tasks.
+
+Use it for:
+
+- Diagnostics
+- File inspection
+- Package checks
+- Service status checks
+- Build/test commands
+- Approved remediation steps
+
+The AI executor should mirror commands and outputs into an execution log so that the user can see everything.
+
+This separation prevents the AI from interfering with the user's active shell while still allowing reliable output
+capture.
+
+---
+
+## 13. AI Workflow
+
+A typical AI task should follow this process:
+```
+text
+User request
+  ↓
+Context collection
+  ↓
+AI plan generation
+  ↓
+Plan review
+  ↓
+Risk classification
+  ↓
+User approval
+  ↓
+Command execution
+  ↓
+Output observation
+  ↓
+AI plan revision
+  ↓
+Completion summary
+```
+Example:
+```
+text
+User: Docker is not starting. Diagnose and fix it.
+```
+The AI might first propose:
+```
+bash
+systemctl status docker --no-pager
+systemctl status containerd --no-pager
+journalctl -u docker --no-pager -n 100
+```
+After observing the output, it may propose:
+```
+bash
+sudo systemctl restart containerd
+sudo systemctl restart docker
+```
+The restart commands should require explicit confirmation because they modify system service state.
+
+---
+
+## 14. Command Risk Model
+
+AI-proposed commands should be classified independently by the application.
+
+The AI's own risk label should not be trusted as the final authority.
+
+---
+
+### 14.1 Read-Only Commands
+
+These are typically safe diagnostic commands:
+```
+bash
+pwd
+ls
+cat
+head
+tail
+df -h
+free -h
+uname -a
+whoami
+id
+ps aux
+systemctl status docker --no-pager
+journalctl -u docker --no-pager -n 100
+git status
+```
+These may be eligible for automatic execution if the user enables that mode.
+
+---
+
+### 14.2 Medium-Risk Commands
+
+These require confirmation:
+```
+bash
+mkdir
+touch
+cp
+mv
+chmod
+chown
+pip install
+npm install
+git checkout
+git pull
+systemctl restart docker
+```
+---
+
+### 14.3 High-Risk Commands
+
+These require explicit confirmation:
+```
+bash
+sudo apt install package
+sudo dnf install package
+sudo pacman -S package
+rm file
+rm -rf directory
+docker system prune
+systemctl stop service
+systemctl disable service
+chmod -R
+chown -R
+curl URL | sh
+wget URL | sh
+```
+---
+
+### 14.4 Blocked or Extremely Dangerous Commands
+
+These should be blocked by default or require a special override:
+```
+bash
+rm -rf /
+rm -rf /*
+dd if=/dev/zero of=/dev/sda
+mkfs.ext4 /dev/sda
+chmod -R 777 /
+chown -R user:user /
+:(){ :|:& };:
+```
+---
+
+## 15. AI Autonomy Modes
+
+ZetaTerminal should support configurable autonomy.
+
+### Mode 1: Ask Only
+
+The AI answers questions but does not propose execution.
+```
+text
+User asks a question.
+AI explains.
+No commands are run.
+```
+---
+
+### Mode 2: Plan Only
+
+The AI creates a plan, but commands are not run.
+```
+text
+AI produces diagnostic and remediation steps.
+User may copy commands manually.
+```
+---
+
+### Mode 3: Confirm Each Command
+
+The AI proposes commands one at a time. The user approves each command before execution.
+
+Recommended early default.
+
+---
+
+### Mode 4: Auto-Run Read-Only Diagnostics
+
+The AI may automatically run read-only commands but must ask before making changes.
+
+Recommended mature default.
+
+---
+
+### Mode 5: Agent Mode
+
+The AI can run multi-step diagnostic and remediation workflows, while still stopping for high-risk commands.
+
+This should only be enabled after the risk classifier, executor, logging, and approval system are mature.
+
+---
+
+## 16. Safety Policy
+
+The safety policy should be strict by default.
+
+Recommended defaults:
+```
+text
+Ask before sudo: always
+Ask before deletion: always
+Ask before package install: always
+Ask before service changes: always
+Ask before permission changes: always
+Ask before network download execution: always
+Allow automatic read-only diagnostics: optional
+Allow destructive commands: off by default
+```
+The user should be able to cancel any running AI task.
+
+The application should provide:
+```
+text
+Stop Task
+Cancel
+Kill Running Command
+Reject Plan
+Approve Step
+Approve All Safe Steps
+```
+---
+
+## 17. Context Collection
+
+The AI should receive enough context to be useful, but not unlimited or sensitive information.
+
+Possible context sources:
+```
+text
+Current working directory
+Operating system information
+Shell path
+Selected terminal output
+Recent command output
+Selected files
+Project tree
+Package manager type
+Git status
+```
+The user should control what context is shared with the AI.
+
+Even though the model is local, the application should avoid including obvious secrets by default.
+
+Avoid automatically sending:
+```
+text
+SSH private keys
+.env files
+API tokens
+password files
+browser credentials
+wallet files
+full shell history
+```
+---
+
+## 18. Prompting Strategy
+
+The AI should be prompted to behave conservatively and produce structured responses when needed.
+
+Example system behavior:
+```
+text
+You are ZetaTerminal Agent, a local AI assistant running inside a Linux terminal application.
+
+You help users diagnose and solve Linux, development, and system tasks.
+
+Rules:
+- Prefer read-only diagnostic commands first.
+- Explain your plan before making changes.
+- Do not hide commands from the user.
+- Do not request destructive commands without clear justification.
+- Ask for confirmation before sudo, deletion, package installation, service changes, permission changes, or network
+download execution.
+- Avoid interactive commands unless handing off to the user.
+- Summarize what you did at the end.
+```
+For planning, structured JSON should be preferred:
+```
+json
+{
+  "summary": "Diagnose why Docker is not starting.",
+  "risk": "medium",
+  "steps": [
+    {
+      "id": 1,
+      "description": "Check Docker service status.",
+      "command": "systemctl status docker --no-pager",
+      "risk": "read_only",
+      "requires_confirmation": false
+    },
+    {
+      "id": 2,
+      "description": "Inspect recent Docker logs.",
+      "command": "journalctl -u docker --no-pager -n 100",
+      "risk": "read_only",
+      "requires_confirmation": false
+    },
+    {
+      "id": 3,
+      "description": "Restart Docker if diagnostics indicate it is appropriate.",
+      "command": "sudo systemctl restart docker",
+      "risk": "high",
+      "requires_confirmation": true
+    }
+  ]
+}
+```
+---
+
+## 19. User Interface Concept
+
+A practical layout:
+```
+text
+┌──────────────────────────────────────────────────────────────┐
+│ Menu / Toolbar                                                │
+├──────────────────────────────────────────────────────────────┤
+│ Terminal Tabs                                      AI Panel   │
+│ ┌──────────────────────────────────────────────┐ ┌─────────┐ │
+│ │                                              │ │ Ask AI  │ │
+│ │ Real terminal session                        │ │         │ │
+│ │                                              │ │ Plan    │ │
+│ │                                              │ │ Actions │ │
+│ └──────────────────────────────────────────────┘ └─────────┘ │
+├──────────────────────────────────────────────────────────────┤
+│ Status: Ollama connected · llama3.1:8b · Safe mode enabled    │
+└──────────────────────────────────────────────────────────────┘
+```
+The terminal should remain the primary interface.
+
+The AI panel should provide:
+
+- Plain-language input
+- Context selection
+- Plan display
+- Risk labels
+- Approval buttons
+- Execution log
+- Final summary
+
+---
+
+## 20. Persistent Settings
+
+ZetaTerminal should remember user preferences.
+
+Recommended settings:
+```
+text
+app.windowGeometry
+app.windowState
+terminal.fontFamily
+terminal.fontSize
+terminal.shell
+terminal.scrollbackLines
+terminal.colorScheme
+terminal.startDirectory
+ai.enabled
+ai.endpoint
+ai.model
+ai.autonomyMode
+ai.allowReadOnlyAutoRun
+ai.requireConfirmationForSudo
+ai.requireConfirmationForDeletion
+ai.maxContextBytes
+ai.maxCommandOutputBytes
+```
+Settings should be validated on load. Invalid settings should fall back to safe defaults.
+
+---
+
+## 21. Logging and Diagnostics
+
+ZetaTerminal should include logs for debugging and auditability.
+
+Recommended log location:
+```
+text
+~/.local/state/zeta-terminal/zeta-terminal.log
+```
+Useful log events:
+```
+text
+Application start
+Qt version
+Terminal backend
+Shell path
+Ollama endpoint
+Selected model
+Settings loaded
+Terminal session started
+Terminal session ended
+AI task started
+AI plan generated
+Command approved
+Command executed
+Command exit code
+AI task completed
+Errors and exceptions
+```
+Sensitive data should not be logged by default.
+
+---
+
+## 22. Documentation Plan
+
+The project should eventually include:
+```
+text
+README.md
+BUILDING.md
+DEPENDENCIES.md
+ARCHITECTURE.md
+SAFETY.md
+OLLAMA.md
+USAGE.md
+CHANGELOG.md
+```
+### README.md
+
+General overview, goals, features, build instructions, and status.
+
+### BUILDING.md
+
+Platform-specific build instructions.
+
+### DEPENDENCIES.md
+
+Required and optional dependencies.
+
+### ARCHITECTURE.md
+
+Technical design and component responsibilities.
+
+### SAFETY.md
+
+AI command execution rules, risk model, and user approval behavior.
+
+### OLLAMA.md
+
+Local AI setup instructions.
+
+### USAGE.md
+
+How to use the terminal and AI features.
+
+---
+
+## 23. Development Roadmap
+
+### Phase 1: Stable Terminal Foundation
+
+Goals:
+
+- Real terminal emulator backend
+- Persistent shell sessions
+- Interactive command support
+- Tabs
+- Copy and paste
+- Scrollback
+- Terminal settings
+- Stable process lifecycle
+
+Acceptance examples:
+```
+bash
+cd /tmp
+export TEST=hello
+echo "$TEST"
+vim test.txt
+top
+sudo -v
+ssh user@host
+```
+---
+
+### Phase 2: Application Architecture
+
+Goals:
+
+- Split source into clear modules
+- Add main window class
+- Add terminal session abstraction
+- Add settings manager
+- Add logging
+- Add documentation skeleton
+
+---
+
+### Phase 3: Local AI Chat
+
+Goals:
+
+- Connect to Ollama
+- Select model
+- Send prompts
+- Receive responses
+- Handle connection errors
+- Show AI in side panel
+
+No command execution yet.
+
+---
+
+### Phase 4: Plan Generation
+
+Goals:
+
+- User enters plain-language task
+- AI creates structured plan
+- UI displays the plan
+- User can approve, reject, or edit plan
+
+No autonomous execution yet.
+
+---
+
+### Phase 5: Command Proposal and Risk Classification
+
+Goals:
+
+- AI proposes commands
+- Application classifies command risk
+- UI displays risk levels
+- User can copy commands to terminal
+- User can approve individual commands
+
+---
+
+### Phase 6: Controlled Command Execution
+
+Goals:
+
+- Execute approved non-interactive commands
+- Capture stdout, stderr, and exit code
+- Enforce timeout
+- Support cancellation
+- Mirror execution log to UI
+- Feed command results back to AI
+
+---
+
+### Phase 7: Agent Loop
+
+Goals:
+
+- AI can plan, execute, observe, and revise
+- User can approve safe batches
+- High-risk commands still require explicit approval
+- Final task summary is produced
+- Task history is saved
+
+---
+
+### Phase 8: Polish and Packaging
+
+Goals:
+
+- Preferences dialog
+- Themes
+- Better model management
+- AppImage or package support
+- User documentation
+- Stability testing
+- Security review
+
+---
+
+## 24. Example Workflow: Docker Diagnosis
+
+User request:
+```
+text
+Docker is not starting. Diagnose and fix it.
+```
+AI plan:
+```
+text
+I will first inspect Docker and containerd status, then check recent logs. I will not restart services without
+approval.
+```
+Read-only commands:
+```
+bash
+systemctl status docker --no-pager
+systemctl status containerd --no-pager
+journalctl -u docker --no-pager -n 100
+```
+If the output indicates that Docker should be restarted, the AI may propose:
+```
+bash
+sudo systemctl restart containerd
+sudo systemctl restart docker
+```
+The application should require confirmation because service restarts can affect running workloads.
+
+Final summary:
+```
+text
+Docker was failing because containerd was inactive.
+
+Actions performed:
+- Checked Docker status
+- Checked containerd status
+- Reviewed Docker logs
+- Restarted containerd
+- Restarted Docker
+- Verified Docker is active
+
+No files were deleted.
+```
+---
+
+## 25. Example Workflow: Disk Cleanup
+
+User request:
+```
+text
+My disk is nearly full. Find out why and clean what is safe.
+```
+Diagnostic commands:
+```
+bash
+df -h
+du -h --max-depth=1 ~ 2>/dev/null | sort -h
+journalctl --disk-usage
+docker system df
+```
+Possible cleanup suggestions:
+```
+bash
+journalctl --vacuum-time=7d
+docker system prune
+rm -rf ~/.cache/*
+```
+Cleanup commands should require confirmation because they delete data or alter system state.
+
+---
+
+## 26. Example Workflow: Project Setup
+
+User request:
+```
+text
+Create a Python virtual environment for this project and install dependencies.
+```
+Possible plan:
+```
+bash
+python3 --version
+ls
+test -f requirements.txt && cat requirements.txt
+python3 -m venv .venv
+. .venv/bin/activate && pip install -r requirements.txt
+```
+The AI should explain what it is doing, detect whether dependency files exist, and avoid overwriting existing
+environments without approval.
+
+---
+
+## 27. Risks and Mitigations
+
+### Risk: AI Hallucinates Dangerous Commands
+
+Mitigation:
+
+- Independent risk classifier
+- Confirmation prompts
+- Blocklist for destructive patterns
+- Read-only diagnostics first
+
+---
+
+### Risk: AI Misdiagnoses a Problem
+
+Mitigation:
+
+- Require observation before remediation
+- Show reasoning and commands
+- Let user reject or edit plan
+- Keep final audit trail
+
+---
+
+### Risk: Commands Hang
+
+Mitigation:
+
+- Timeouts
+- Cancellation controls
+- Kill running command button
+
+---
+
+### Risk: Sensitive Data Exposure
+
+Mitigation:
+
+- Local-only AI by default
+- Context selection
+- Secret filtering
+- Avoid sending `.env`, private keys, and token files by default
+
+---
+
+### Risk: Terminal Instability
+
+Mitigation:
+
+- Use a mature terminal backend
+- Keep AI layer separate
+- Ensure terminal works without AI
+- Add logging and session lifecycle management
+
+---
+
+## 28. Recommended Default Configuration
+```
+text
+Terminal backend: real PTY terminal widget
+AI endpoint: http://127.0.0.1:11434
+AI autonomy mode: Confirm Each Command
+Auto-run read-only diagnostics: Disabled initially
+Require confirmation for sudo: Enabled
+Require confirmation for deletion: Enabled
+Require confirmation for package installs: Enabled
+Require confirmation for service changes: Enabled
+Command timeout: 30 seconds
+Max terminal context: last 200 lines
+Max command output sent to AI: 40 KB
+```
+---
+
+## 29. Long-Term Possibilities
+
+Future features could include:
+
+- Shell command explanations
+- Error explanation from selected terminal output
+- AI-generated shell pipelines
+- Project-aware build and test assistance
+- Git workflow assistance
+- System service troubleshooting
+- Package manager assistance
+- Secure task history
+- Rollback suggestions
+- Plugin system
+- Voice input
+- Local embedding search over documentation
+- Per-project AI profiles
+- Multi-model support
+- Offline documentation indexing
+
+---
+
+## 30. Positioning
+
+ZetaTerminal can be positioned as:
+```
+text
+A local-first AI terminal for Linux.
+```
+Or:
+```
+text
+A private, offline-capable AI terminal powered by Ollama.
+```
+Expanded statement:
+```
+text
+ZetaTerminal is a Linux terminal emulator with an integrated local AI agent. It helps users diagnose, understand,
+and fix system or development tasks using plain language, while keeping commands visible, requiring approval for
+risky actions, and avoiding cloud dependency.
+```
+---
+
+## 31. Conclusion
+
+ZetaTerminal should be built on a simple but strict foundation:
+```
+text
+Real terminal emulator
++ local Ollama client
++ structured AI planning
++ command risk classification
++ controlled execution
++ visible audit trail
++ user approval
+```
+The project should not begin by giving an AI unrestricted access to the shell. Instead, it should grow through safe
+stages:
+
+1. Stable terminal
+2. Local AI chat
+3. Plan generation
+4. Command proposal
+5. Risk classification
+6. Controlled execution
+7. Agentic task loops
+
+This approach allows ZetaTerminal to become a serious local alternative to cloud-based AI terminals while preserving
+user control, privacy, transparency, and Linux terminal reliability.
+```
