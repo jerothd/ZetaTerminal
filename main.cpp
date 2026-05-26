@@ -60,6 +60,8 @@ public:
         m_cursorY = 0;
         m_cols = 80;
         m_rows = 24;
+        m_topMargin = 0;
+        m_bottomMargin = m_rows - 1;
 
         setFocusPolicy(Qt::StrongFocus);
         setAttribute(Qt::WA_OpaquePaintEvent);
@@ -94,7 +96,7 @@ public:
 
         if (pid == 0) {
             // Child process
-            setenv("TERM", "vt100", 1);
+            setenv("TERM", "xterm-256color", 1);
             setenv("PS1", "[\\u@\\h \\W]\\$ ", 1);
             execl("/bin/bash", "bash", "-i", NULL);
             _exit(1);
@@ -161,6 +163,9 @@ protected:
 
             resizeGrid(m_grid);
             if (!m_savedGrid.isEmpty()) resizeGrid(m_savedGrid);
+
+            m_topMargin = 0;
+            m_bottomMargin = m_rows - 1;
             
             // Constrain cursor
             m_cursorX = qMin(m_cursorX, m_cols - 1);
@@ -197,14 +202,14 @@ protected:
                     painter.fillRect(cellRect, bg);
                 }
                 
-                if (cell.c != ' ' && cell.c != 0) {
+                if (cell.c > 32 && cell.c != 0x7f) {
                     painter.setPen(fg);
                     painter.setFont(cell.bold ? boldFont : m_font);
                     
                     // Use UCS-4 to support characters outside BMP (like 🌀)
                     char32_t ucs4 = (char32_t)cell.c;
                     QString s = QString::fromUcs4(&ucs4, 1);
-                    painter.drawText(cellRect, Qt::AlignLeft | Qt::AlignVCenter, s);
+                    painter.drawText(cellRect, Qt::AlignLeft | Qt::AlignTop, s);
                 }
             }
         }
@@ -330,6 +335,24 @@ private slots:
                         if (j + 1 < m_buffer.size() && (uint8_t)m_buffer[j+1] == '\\') j++;
                     }
                     consumed = j + 1;
+                } else if (next == 'M') {
+                    // RI (Reverse Index)
+                    if (m_cursorY == m_topMargin) {
+                        scrollDown();
+                    } else if (m_cursorY > 0) {
+                        m_cursorY--;
+                    }
+                    consumed = 2;
+                } else if (next == '7') {
+                    // DECSC (Save Cursor)
+                    m_savedX = m_cursorX;
+                    m_savedY = m_cursorY;
+                    consumed = 2;
+                } else if (next == '8') {
+                    // DECRC (Restore Cursor)
+                    m_cursorX = m_savedX;
+                    m_cursorY = m_savedY;
+                    consumed = 2;
                 } else {
                     consumed = 2;
                 }
@@ -338,8 +361,8 @@ private slots:
                 consumed = 1;
             } else if (c == '\n') {
                 m_cursorY++;
-                if (m_cursorY >= m_rows) {
-                    m_cursorY = m_rows - 1;
+                if (m_cursorY > m_bottomMargin) {
+                    m_cursorY = m_bottomMargin;
                     scrollUp();
                 }
                 consumed = 1;
@@ -368,6 +391,9 @@ private slots:
                     }
                     consumed = len;
                 }
+            } else if (c < 32 || c == 0x7f) {
+                // Ignore other control characters to avoid hollow blocks
+                consumed = 1;
             } else {
                 putChar(c);
                 consumed = 1;
@@ -386,9 +412,11 @@ private slots:
         if (m_cursorX >= m_cols) {
             m_cursorX = 0;
             m_cursorY++;
-            if (m_cursorY >= m_rows) {
-                m_cursorY = m_rows - 1;
+            if (m_cursorY > m_bottomMargin) {
+                m_cursorY = m_bottomMargin;
                 scrollUp();
+            } else if (m_cursorY >= m_rows) {
+                m_cursorY = m_rows - 1;
             }
         }
         if (m_cursorY < m_rows && m_cursorX < m_cols) {
@@ -403,10 +431,27 @@ private slots:
     }
 
     void scrollUp() {
-        for (int r = 0; r < m_rows - 1; ++r) {
+        int top = m_topMargin;
+        int bottom = m_bottomMargin;
+        if (top < 0 || bottom >= m_rows || top >= bottom) {
+            top = 0; bottom = m_rows - 1;
+        }
+        for (int r = top; r < bottom; ++r) {
             m_grid[r] = m_grid[r+1];
         }
-        m_grid[m_rows-1] = QVector<TermCell>(m_cols);
+        m_grid[bottom] = QVector<TermCell>(m_cols);
+    }
+
+    void scrollDown() {
+        int top = m_topMargin;
+        int bottom = m_bottomMargin;
+        if (top < 0 || bottom >= m_rows || top >= bottom) {
+            top = 0; bottom = m_rows - 1;
+        }
+        for (int r = bottom; r > top; --r) {
+            m_grid[r] = m_grid[r-1];
+        }
+        m_grid[top] = QVector<TermCell>(m_cols);
     }
 
     void scrollIfNeeded() {
@@ -438,19 +483,23 @@ private slots:
         } else if (code == 'd') { // VPA
             int r = params.isEmpty() ? 1 : p[0].toInt();
             m_cursorY = qBound(0, r - 1, m_rows - 1);
-        } else if (code == 'L') { // IL
+        } else if (code == 'L') { // IL (Insert Line)
             int n = params.isEmpty() ? 1 : p[0].toInt();
-            int count = (n == 0 ? 1 : n);
-            for (int i = 0; i < count; ++i) {
-                m_grid.insert(m_cursorY, QVector<TermCell>(m_cols));
-                m_grid.pop_back();
+            int count = qBound(0, (n == 0 ? 1 : n), m_rows);
+            if (m_cursorY >= m_topMargin && m_cursorY <= m_bottomMargin) {
+                for (int i = 0; i < count; ++i) {
+                    m_grid.insert(m_cursorY, QVector<TermCell>(m_cols));
+                    m_grid.remove(m_bottomMargin + 1);
+                }
             }
-        } else if (code == 'M') { // DL
+        } else if (code == 'M') { // DL (Delete Line)
             int n = params.isEmpty() ? 1 : p[0].toInt();
-            int count = (n == 0 ? 1 : n);
-            for (int i = 0; i < count; ++i) {
-                m_grid.remove(m_cursorY);
-                m_grid.push_back(QVector<TermCell>(m_cols));
+            int count = qBound(0, (n == 0 ? 1 : n), m_rows);
+            if (m_cursorY >= m_topMargin && m_cursorY <= m_bottomMargin) {
+                for (int i = 0; i < count; ++i) {
+                    m_grid.remove(m_cursorY);
+                    m_grid.insert(m_bottomMargin, QVector<TermCell>(m_cols));
+                }
             }
         } else if (code == 'P') { // DCH
             int n = params.isEmpty() ? 1 : p[0].toInt();
@@ -539,6 +588,25 @@ private slots:
                     }
                 }
             }
+        } else if (code == 'r') { // DECSTBM
+            int top = p.size() > 0 ? qMax(1, p[0].toInt()) : 1;
+            int bottom = p.size() > 1 ? qMax(1, p[1].toInt()) : m_rows;
+            m_topMargin = qBound(0, top - 1, m_rows - 1);
+            m_bottomMargin = qBound(0, bottom - 1, m_rows - 1);
+            m_cursorX = 0;
+            m_cursorY = 0;
+        } else if (code == 'S') { // SU
+            int n = params.isEmpty() ? 1 : p[0].toInt();
+            for(int i=0; i<n; ++i) scrollUp();
+        } else if (code == 'T') { // SD
+            int n = params.isEmpty() ? 1 : p[0].toInt();
+            for(int i=0; i<n; ++i) scrollDown();
+        } else if (code == 's') { // SCOSC (Save Cursor)
+            m_savedX = m_cursorX;
+            m_savedY = m_cursorY;
+        } else if (code == 'u') { // SCORC (Restore Cursor)
+            m_cursorX = m_savedX;
+            m_cursorY = m_savedY;
         }
     }
 
@@ -586,6 +654,8 @@ private:
     QVector<QVector<TermCell>> m_savedGrid;
     int m_savedCursorX = 0, m_savedCursorY = 0;
     bool m_isAltScreen = false;
+    int m_topMargin = 0, m_bottomMargin = 23;
+    int m_savedX = 0, m_savedY = 0;
 };
 #endif
 
